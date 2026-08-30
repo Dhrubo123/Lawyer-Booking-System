@@ -11,9 +11,9 @@ const selectedService = ref('');
 const selectedDate = ref('');
 const selectedTime = ref('');
 
-const availableSlots = ref([]);
 const dateLabel = (date) => new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`));
 const weekdayLabel = (date) => new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(`${date}T00:00:00`));
+const timeLabel = (time) => new Date(`2000-01-01T${time}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 const form = useForm({
     consultation_type: '',
@@ -67,23 +67,12 @@ const selectService = (service) => {
     form.service_id = service.id;
 };
 
-const selectDate = async (date) => {
+const selectSlot = (date, slot) => {
     selectedDate.value = date;
-    selectedTime.value = '';
-
-    form.appointment_date = date;
-    form.start_time = '';
-
-    try {
-        const response = await fetch(`/available-slots?date=${encodeURIComponent(date)}`, { headers: { Accept: 'application/json' } });
-        const payload = await response.json();
-        availableSlots.value = (payload.slots || []).map((slot) => ({ ...slot, label: new Date(`2000-01-01T${slot.start_time}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }));
-    } catch { availableSlots.value = []; }
-};
-
-const selectTime = (slot) => {
     selectedTime.value = slot;
+    form.appointment_date = date;
     form.start_time = slot.start_time;
+    step.value = 4;
 };
 
 const submitAppointment = () => {
@@ -306,59 +295,37 @@ const submitAppointment = () => {
                         </h2>
 
                         <p class="mt-2 text-[#77777F]">
-                            Available times will be loaded from the lawyer's
-                            schedule.
+                            Select one of the appointment times published by the lawyer.
                         </p>
                         <p v-if="form.errors.start_time" class="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ form.errors.start_time }}</p>
 
-                        <div
-                            class="mt-7 grid gap-8 md:grid-cols-2"
-                        >
-                            <div>
-                                <h3 class="font-semibold">
-                                    Choose a date
-                                </h3>
+                        <div v-if="availableDates.length" class="date-card-grid mt-7">
+                            <article
+                                v-for="availableDate in availableDates"
+                                :key="availableDate.date"
+                                class="date-card"
+                                :class="{ selected: selectedDate === availableDate.date, unavailable: availableDate.available_slots === 0 }"
+                            >
+                                <span>{{ dateLabel(availableDate.date) }}</span>
+                                <strong>{{ weekdayLabel(availableDate.date) }}</strong>
+                                <small>{{ availableDate.available_slots }} available slot{{ availableDate.available_slots === 1 ? '' : 's' }}</small>
 
-                                <div v-if="availableDates.length" class="date-card-grid mt-4">
-                                    <button v-for="availableDate in availableDates" :key="availableDate.date" type="button" class="date-card" :class="{ selected: selectedDate === availableDate.date, unavailable: availableDate.available_slots === 0 }" :disabled="availableDate.available_slots === 0" @click="selectDate(availableDate.date)"><span>{{ dateLabel(availableDate.date) }}</span><strong>{{ weekdayLabel(availableDate.date) }}</strong><small>{{ availableDate.available_slots }} available slot{{ availableDate.available_slots === 1 ? '' : 's' }}</small><em>{{ availableDate.available_slots ? 'Choose time' : 'Fully booked' }}</em></button>
-                                </div>
-                                <p v-else class="mt-4 rounded-xl bg-[#F4E8DF] p-4 text-sm text-[#77777F]">No appointment dates are currently available. Please contact us or check again later.</p>
-                            </div>
-
-                            <div>
-                                <h3 class="font-semibold">
-                                    Available time
-                                </h3>
-
-                                <div
-                                    v-if="availableSlots.length"
-                                    class="mt-4 grid grid-cols-2 gap-3"
-                                >
+                                <div v-if="availableDate.slots?.length" class="mt-3 grid gap-2">
                                     <button
-                                        v-for="slot in availableSlots"
+                                        v-for="slot in availableDate.slots"
                                         :key="slot.start_time"
                                         type="button"
-                                        @click="selectTime(slot)"
-                                        class="rounded-xl border px-4 py-3 transition"
-                                        :class="
-                                            selectedTime?.start_time ===
-                                            slot.start_time
-                                                ? 'border-[#B56E3C] bg-[#F4E8DF]'
-                                                : 'border-[#E4DED9] hover:border-[#B56E3C]'
-                                        "
+                                        class="w-full rounded-lg bg-[#B56E3C] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#94552B]"
+                                        @click="selectSlot(availableDate.date, slot)"
                                     >
-                                        {{ slot.label }}
+                                        {{ timeLabel(slot.start_time) }} – {{ timeLabel(slot.end_time) }}
                                     </button>
                                 </div>
 
-                                <p
-                                    v-else
-                                    class="mt-4 rounded-xl bg-[#F7F5F1] p-4 text-sm text-[#77777F]"
-                                >
-                                    Select a date to view available times.
-                                </p>
-                            </div>
+                                <em v-else>Fully booked</em>
+                            </article>
                         </div>
+                        <p v-else class="mt-7 rounded-xl bg-[#F4E8DF] p-4 text-sm text-[#77777F]">No appointment dates are currently available. Please contact us or check again later.</p>
                     </div>
 
                     <!-- STEP 4 -->

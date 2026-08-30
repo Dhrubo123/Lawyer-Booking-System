@@ -117,10 +117,24 @@ class BookingController extends Controller
         if ($specificDates->isNotEmpty()) {
             return $specificDates
                 ->groupBy(fn (AvailabilityDate $date) => $date->date->toDateString())
-                ->map(fn ($periods, string $date) => ['date' => $date, 'available_slots' => count($this->availableSlots(Carbon::parse($date)))])
+                ->map(function ($periods, string $date) {
+                    $slots = $this->availableSlots(Carbon::parse($date));
+
+                    return ['date' => $date, 'available_slots' => count($slots), 'slots' => $slots];
+                })
                 ->values()
                 ->all();
         }
-        return collect(range(0, 30))->map(fn (int $offset) => today()->addDays($offset))->map(fn (Carbon $date) => ['date' => $date->toDateString(), 'available_slots' => count($this->availableSlots($date))])->filter(fn (array $date) => $date['available_slots'] > 0)->take(12)->values()->all();
+        return collect(range(0, 30))
+            ->map(fn (int $offset) => today()->addDays($offset))
+            ->map(function (Carbon $date) {
+                $slots = $this->availableSlots($date);
+
+                return ['date' => $date->toDateString(), 'available_slots' => count($slots), 'slots' => $slots];
+            })
+            ->filter(fn (array $date) => $date['available_slots'] > 0)
+            ->take(12)
+            ->values()
+            ->all();
     }
 }
