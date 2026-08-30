@@ -420,7 +420,7 @@ const submitAppointment = () => {
 
                             <Link
                                 href="/"
-                                class="mt-7 inline-flex rounded-xl bg-[#22262B] px-6 py-3 font-medium text-white transition hover:bg-[#B56E3C]"
+                                class="mt-7 inline-flex rounded-xl bg-[#B56E3C] px-6 py-3 font-semibold text-white transition hover:bg-[#94552B]"
                             >
                                 Back to Home
                             </Link>

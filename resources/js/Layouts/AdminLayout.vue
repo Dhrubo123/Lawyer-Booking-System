@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 
 const open = ref(false);
 const page = usePage();
@@ -11,6 +11,7 @@ const links = [
     ['Tax Insights', 'admin.insights', '/admin/tax-insights'], ['Settings', 'admin.settings', '/admin/settings'],
 ];
 const current = (url) => page.url.startsWith(url);
+const logout = () => router.post('/admin/logout');
 </script>
 
 <template>
@@ -21,7 +22,10 @@ const current = (url) => page.url.startsWith(url);
             <nav aria-label="Admin navigation">
                 <Link v-for="([label, _name, href]) in links" :key="href" :href="href" class="nav-link" :class="{ active: current(href) }" @click="open = false">{{ label }}</Link>
             </nav>
-            <Link href="/" class="admin-exit">← View website</Link>
+            <div class="admin-sidebar-actions">
+                <Link href="/" class="admin-exit">← View website</Link>
+                <button type="button" class="admin-logout" @click="logout">Log out</button>
+            </div>
         </aside>
         <main class="admin-main">
             <header class="admin-topbar"><button class="menu-button" aria-label="Open navigation" @click="open = true">☰</button><div><p>Tax & General Services</p><strong>Administration</strong></div><div class="admin-avatar">A</div></header>
