@@ -43,6 +43,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::put('/availability/{availabilitySchedule}', [AvailabilityController::class, 'update'])->name('availability.update');
         Route::delete('/availability/{availabilitySchedule}', [AvailabilityController::class, 'destroy'])->name('availability.destroy');
         Route::post('/availability/dates', [AvailabilityController::class, 'storeDate'])->name('availability.dates.store');
+        Route::post('/availability/dates/{availabilityDate}/remove', [AvailabilityController::class, 'destroyDate'])->name('availability.dates.remove');
         Route::put('/availability/dates/{availabilityDate}', [AvailabilityController::class, 'updateDate'])->name('availability.dates.update');
         Route::delete('/availability/dates/{availabilityDate}', [AvailabilityController::class, 'destroyDate'])->name('availability.dates.destroy');
 

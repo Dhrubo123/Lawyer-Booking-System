@@ -13,7 +13,7 @@ const selectedTime = ref('');
 
 const dateLabel = (date) => new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`));
 const weekdayLabel = (date) => new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(`${date}T00:00:00`));
-const timeLabel = (time) => new Date(`2000-01-01T${time}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const timeLabel = (time) => new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
 const form = useForm({
     consultation_type: '',
