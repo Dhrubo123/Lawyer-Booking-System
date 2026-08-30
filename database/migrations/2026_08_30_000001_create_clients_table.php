@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\Schema;
+return new class extends Migration { public function up(): void { Schema::create('clients', function (Blueprint $table) { $table->id(); $table->string('name'); $table->string('phone')->unique(); $table->string('email')->nullable(); $table->timestamps(); }); Schema::table('appointments', fn (Blueprint $table) => $table->foreignId('client_id')->nullable()->after('id')->constrained()->nullOnDelete()); } public function down(): void { Schema::table('appointments', fn (Blueprint $table) => $table->dropConstrainedForeignId('client_id')); Schema::dropIfExists('clients'); } };
