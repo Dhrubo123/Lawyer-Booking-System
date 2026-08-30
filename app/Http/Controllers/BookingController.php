@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\AvailabilityException;
 use App\Models\AvailabilitySchedule;
+use App\Models\AvailabilityDate;
 use App\Models\Client;
 use App\Models\Service;
 use App\Models\Setting;
@@ -25,6 +26,7 @@ class BookingController extends Controller
             'services' => Service::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name', 'short_description', 'duration', 'fee']),
             'confirmedAppointment' => $request->session()->get('appointment'),
             'branding' => ['logo_url' => Setting::valueFor('logo_url')],
+            'availableDates' => $this->bookableDates(),
         ]);
     }
 
@@ -68,22 +70,57 @@ class BookingController extends Controller
     {
         $exception = AvailabilityException::query()->whereDate('date', $date)->first();
         if ($exception?->type === 'blocked' && is_null($exception->start_time)) return [];
-        $schedule = AvailabilitySchedule::query()->where('day_of_week', $date->dayOfWeek)->first();
-        if ($exception?->type === 'override') $schedule = $exception;
-        if (! $schedule || (property_exists($schedule, 'is_available') && ! $schedule->is_available)) return [];
-        $duration = $requestedDuration ?? $schedule->slot_duration;
-        $start = Carbon::parse($date->toDateString().' '.$schedule->start_time);
-        $end = Carbon::parse($date->toDateString().' '.$schedule->end_time);
-        $breaks = $schedule instanceof AvailabilitySchedule ? $schedule->breaks : collect();
+
+        $specificSchedules = AvailabilityDate::query()
+            ->whereDate('date', $date)
+            ->where('is_available', true)
+            ->orderBy('start_time')
+            ->get();
+
+        // Specific dates take priority over the weekly schedule. A date may
+        // have more than one non-overlapping availability period.
+        if ($exception?->type === 'override') {
+            $schedules = collect([$exception]);
+        } elseif ($specificSchedules->isNotEmpty()) {
+            $schedules = $specificSchedules;
+        } else {
+            $weeklySchedule = AvailabilitySchedule::query()->where('day_of_week', $date->dayOfWeek)->first();
+            if (! $weeklySchedule || ! $weeklySchedule->is_available) return [];
+            $schedules = collect([$weeklySchedule]);
+        }
+
         $taken = Appointment::query()->whereDate('appointment_date', $date)->whereNotIn('status', ['cancelled'])->pluck('start_time')->map(fn ($time) => substr($time, 0, 5));
         $slots = [];
-        while ($start->copy()->addMinutes($duration)->lte($end)) {
-            $slotEnd = $start->copy()->addMinutes($duration);
-            $blocked = $exception?->type === 'blocked' && $exception->start_time && $start->format('H:i:s') < $exception->end_time && $slotEnd->format('H:i:s') > $exception->start_time;
-            $inBreak = $breaks->contains(fn ($break) => $start->format('H:i:s') < $break->end_time && $slotEnd->format('H:i:s') > $break->start_time);
-            if (! $blocked && ! $inBreak && ! $taken->contains($start->format('H:i'))) $slots[] = ['start_time' => $start->format('H:i'), 'end_time' => $slotEnd->format('H:i')];
-            $start->addMinutes($duration);
+        foreach ($schedules as $schedule) {
+            $duration = $requestedDuration ?? $schedule->slot_duration;
+            $start = Carbon::parse($date->toDateString().' '.$schedule->start_time);
+            $end = Carbon::parse($date->toDateString().' '.$schedule->end_time);
+            $breaks = $schedule instanceof AvailabilitySchedule ? $schedule->breaks : collect();
+
+            while ($start->copy()->addMinutes($duration)->lte($end)) {
+                $slotEnd = $start->copy()->addMinutes($duration);
+                $blocked = $exception?->type === 'blocked' && $exception->start_time && $start->format('H:i:s') < $exception->end_time && $slotEnd->format('H:i:s') > $exception->start_time;
+                $inBreak = $breaks->contains(fn ($break) => $start->format('H:i:s') < $break->end_time && $slotEnd->format('H:i:s') > $break->start_time);
+                if (! $blocked && ! $inBreak && ! $taken->contains($start->format('H:i'))) {
+                    $slots[] = ['start_time' => $start->format('H:i'), 'end_time' => $slotEnd->format('H:i')];
+                }
+                $start->addMinutes($duration);
+            }
         }
-        return $slots;
+
+        return collect($slots)->unique('start_time')->sortBy('start_time')->values()->all();
+    }
+
+    private function bookableDates(): array
+    {
+        $specificDates = AvailabilityDate::query()->whereDate('date', '>=', today())->where('is_available', true)->orderBy('date')->get();
+        if ($specificDates->isNotEmpty()) {
+            return $specificDates
+                ->groupBy(fn (AvailabilityDate $date) => $date->date->toDateString())
+                ->map(fn ($periods, string $date) => ['date' => $date, 'available_slots' => count($this->availableSlots(Carbon::parse($date)))])
+                ->values()
+                ->all();
+        }
+        return collect(range(0, 30))->map(fn (int $offset) => today()->addDays($offset))->map(fn (Carbon $date) => ['date' => $date->toDateString(), 'available_slots' => count($this->availableSlots($date))])->filter(fn (array $date) => $date['available_slots'] > 0)->take(12)->values()->all();
     }
 }

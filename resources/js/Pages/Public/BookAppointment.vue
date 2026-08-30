@@ -2,7 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
-const { services, confirmedAppointment, branding } = defineProps({ services: Array, confirmedAppointment: Object, branding: Object });
+const { services, confirmedAppointment, branding, availableDates } = defineProps({ services: Array, confirmedAppointment: Object, branding: Object, availableDates: Array });
 
 const step = ref(confirmedAppointment ? 5 : 1);
 
@@ -12,6 +12,8 @@ const selectedDate = ref('');
 const selectedTime = ref('');
 
 const availableSlots = ref([]);
+const dateLabel = (date) => new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`));
+const weekdayLabel = (date) => new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(`${date}T00:00:00`));
 
 const form = useForm({
     consultation_type: '',
@@ -317,7 +319,10 @@ const submitAppointment = () => {
                                     Choose a date
                                 </h3>
 
-                                <input :min="new Date().toISOString().slice(0, 10)" type="date" class="mt-4 w-full rounded-xl border border-[#E4DED9] px-4 py-4" @change="selectDate($event.target.value)">
+                                <div v-if="availableDates.length" class="date-card-grid mt-4">
+                                    <button v-for="availableDate in availableDates" :key="availableDate.date" type="button" class="date-card" :class="{ selected: selectedDate === availableDate.date, unavailable: availableDate.available_slots === 0 }" :disabled="availableDate.available_slots === 0" @click="selectDate(availableDate.date)"><span>{{ dateLabel(availableDate.date) }}</span><strong>{{ weekdayLabel(availableDate.date) }}</strong><small>{{ availableDate.available_slots }} available slot{{ availableDate.available_slots === 1 ? '' : 's' }}</small><em>{{ availableDate.available_slots ? 'Choose time' : 'Fully booked' }}</em></button>
+                                </div>
+                                <p v-else class="mt-4 rounded-xl bg-[#F4E8DF] p-4 text-sm text-[#77777F]">No appointment dates are currently available. Please contact us or check again later.</p>
                             </div>
 
                             <div>
